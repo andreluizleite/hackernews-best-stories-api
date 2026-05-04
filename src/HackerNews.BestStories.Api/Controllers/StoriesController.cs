@@ -23,12 +23,18 @@ public sealed class StoriesController : ControllerBase
 
     [HttpGet("best")]
     public async Task<IActionResult> GetBestStories(
-        [FromQuery] int n,
-        CancellationToken cancellationToken)
+     [FromQuery] int n,
+     CancellationToken cancellationToken)
     {
         if (!BestStoriesRequestValidator.IsValid(n, _options.MaxStoriesRequestLimit))
         {
-            return BadRequest($"Parameter 'n' must be greater than 0 and less than or equal to {_options.MaxStoriesRequestLimit}.");
+            return Problem(
+                title: "Invalid query parameter",
+                detail: $"Parameter 'n' must be greater than 0 and less than or equal to {_options.MaxStoriesRequestLimit}.",
+                statusCode: StatusCodes.Status400BadRequest,
+                type: "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+                instance: HttpContext.Request.Path
+            );
         }
 
         var stories = await _bestStoriesService.GetBestStoriesAsync(n, cancellationToken);

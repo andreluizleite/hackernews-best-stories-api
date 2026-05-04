@@ -32,7 +32,7 @@ public sealed class BestStoriesService : IBestStoriesService
     {
         var storyIds = await GetBestStoryIdsAsync(cancellationToken);
 
-        var candidates = storyIds.Take(Math.Max(n * 3, n)).ToList();
+        var candidates = storyIds.ToList();
 
         var stories = await GetStoryDetailsAsync(candidates, cancellationToken);
 
