@@ -122,13 +122,13 @@ dotnet run
 The API will be available at:
 
 ```
-https://localhost:5001
+https://localhost:7071
 ```
 
 Swagger UI:
 
 ```
-https://localhost:5001/swagger
+https://localhost:7071/swagger
 ```
 
 ---
