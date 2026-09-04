@@ -1,47 +1,49 @@
-# HackerNews Best Stories API
+# Hacker News Best Stories API
 
-## Overview
+A portfolio-sized ASP.NET Core API that retrieves and ranks the best stories from the official Hacker News API. The project focuses on reliable HTTP integration, controlled concurrency, caching, observability endpoints, and automated testing without introducing unnecessary infrastructure.
 
-This project is a RESTful API built with ASP.NET Core that retrieves the top **N best stories** from the Hacker News API, ordered by score in descending order.
+## Why this project exists
 
-The API is designed with performance, scalability, and external API protection in mind.
+Fetching the top stories is not a single upstream request. Hacker News first returns story identifiers and then requires one request per story. This API coordinates those calls while protecting both the application and the external dependency.
 
----
+## Highlights
 
-## Features
+- ASP.NET Core and .NET 10
+- Typed `HttpClient` integration with the official Hacker News API
+- Standard .NET HTTP resilience pipeline
+- Controlled parallelism with `SemaphoreSlim`
+- In-memory caching for story identifiers and details
+- Filtering and deterministic score ordering
+- RFC 9457-style Problem Details responses
+- Per-client API rate limiting
+- Liveness and dependency-readiness health checks
+- Unit and in-process API integration tests
+- Docker image and GitHub Actions CI
 
-* Retrieve top **N best stories**
-* Sorted by **score (descending)**
-* Efficient handling of external API calls
-* In-memory caching to reduce load on Hacker News API
-* Concurrent data fetching with controlled parallelism
-* Clean and testable architecture
+## Request flow
 
----
-
-## External API
-
-This project integrates with the official Hacker News API:
-
-* Best story IDs:
-  https://hacker-news.firebaseio.com/v0/beststories.json
-
-* Story details:
-  https://hacker-news.firebaseio.com/v0/item/{id}.json
-
----
-
-## Endpoint
-
-### GET /api/stories/best?n={number}
-
-#### Example
-
+```text
+Client
+  -> StoriesController
+     -> BestStoriesService
+        -> IMemoryCache
+        -> HackerNewsClient
+           -> Hacker News API
 ```
+
+The service first reads the list of candidate identifiers. Story details are then fetched concurrently with a configurable concurrency limit. Valid stories are ordered by score and the requested number of results is returned.
+
+## API
+
+### Get best stories
+
+```http
 GET /api/stories/best?n=10
 ```
 
-#### Response
+`n` must be between `1` and the configured `MaxStoriesRequestLimit`.
+
+Example response:
 
 ```json
 [
@@ -49,113 +51,85 @@ GET /api/stories/best?n=10
     "title": "Example story",
     "uri": "https://example.com",
     "postedBy": "author",
-    "time": "2024-01-01T12:00:00Z",
+    "time": "2026-01-01T12:00:00+00:00",
     "score": 1234,
     "commentCount": 100
   }
 ]
 ```
 
----
+### Health checks
 
-## Architecture
-
-The application follows a clean and modular structure:
-
-```
-Controller
-  → Service Layer
-      → HackerNews Client (HttpClient)
-      → Cache Layer (IMemoryCache)
+```http
+GET /health/live
+GET /health/ready
 ```
 
-### Key Components
+The liveness endpoint confirms that the application process is running. The readiness endpoint also verifies access to the Hacker News API.
 
-* **Controller**
-  Handles HTTP requests and validation
+## Run locally
 
-* **Service Layer**
-  Business logic, sorting, filtering, orchestration
+Prerequisites:
 
-* **HackerNews Client**
-  Responsible for external API communication
+- .NET 10 SDK
 
-* **Caching**
-  Reduces redundant calls to Hacker News API
-
----
-
-## Performance Considerations
-
-To avoid overloading the Hacker News API:
-
-* Results are cached using `IMemoryCache`
-* Story details are fetched in parallel with controlled concurrency
-* Repeated requests reuse cached data
-* Optional limit on `n` to prevent excessive load
-
----
-
-## Assumptions
-
-* `n` must be greater than 0
-* A maximum limit (e.g., 100) may be enforced
-* Stories marked as `deleted` or `dead` are ignored
-* Missing fields are handled gracefully
-
----
-
-## Running the Application
-
-### Prerequisites
-
-* .NET 8 SDK (or later)
-
-### Run
-
-```bash
+```powershell
 dotnet restore
-dotnet build
-dotnet run
+dotnet run --project src/HackerNews.BestStories.Api
 ```
 
-The API will be available at:
+Use the HTTP address displayed by ASP.NET Core and open `/swagger`.
 
-```
-https://localhost:7071
-```
+Example:
 
-Swagger UI:
-
-```
-https://localhost:7071/swagger
+```powershell
+Invoke-RestMethod "http://localhost:5186/api/stories/best?n=10"
 ```
 
----
+The exact local port is defined by `Properties/launchSettings.json` and may differ when a port is already in use.
 
-## Testing
+## Run with Docker
 
-Unit tests can be executed with:
-
-```bash
-dotnet test
+```powershell
+docker build -t hackernews-best-stories-api .
+docker run --rm -p 8080:8080 hackernews-best-stories-api
 ```
 
----
+Then open `http://localhost:8080/swagger`.
 
-## Possible Improvements
+## Tests
 
-Given more time, the following enhancements could be implemented:
+```powershell
+dotnet test HackerNews.BestStories.sln --configuration Release
+```
 
-* Distributed caching (e.g., Redis)
-* Rate limiting and circuit breaker (Polly)
-* Background refresh of cached stories
-* Pagination support
-* Observability (logging, metrics, tracing)
-* Load testing and benchmarking
+The test suite covers ranking, invalid upstream stories, mapping, caching, request validation, API serialization, and liveness.
 
----
+## Configuration
 
-## Notes
+Configuration is available under the `HackerNews` section in `appsettings.json`:
 
-This project was developed as part of a coding challenge and focuses on clarity, correctness, and performance under realistic conditions.
+| Setting | Purpose |
+| --- | --- |
+| `BaseUrl` | Hacker News API base address |
+| `MaxStoriesRequestLimit` | Maximum accepted value for `n` |
+| `MaxConcurrentRequests` | Maximum simultaneous story-detail requests |
+| `BestStoryIdsCacheMinutes` | Cache lifetime for the identifier list |
+| `StoryDetailsCacheMinutes` | Cache lifetime for individual stories |
+
+## Design decisions and trade-offs
+
+- `IMemoryCache` keeps the sample easy to run. Multiple replicas would require a distributed cache if they needed to share cached state.
+- Controlled concurrency reduces response time without creating an unbounded number of outbound requests.
+- Partial item failures are logged and ignored, so one unavailable story does not fail the complete response.
+- Readiness checks include the external API, while liveness intentionally does not.
+- The project remains a focused API rather than pretending to be a microservices platform.
+
+## Potential production evolution
+
+- OpenTelemetry trace and metric export
+- Distributed cache for multi-replica deployments
+- Output caching with explicit freshness requirements
+- Load tests and service-level objectives
+
+These are documented as evolution options, not requirements for this portfolio scope.
