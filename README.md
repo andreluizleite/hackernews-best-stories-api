@@ -1,5 +1,10 @@
 # Hacker News Best Stories API
 
+[![CI](https://github.com/andreluizleite/hackernews-best-stories-api/actions/workflows/ci.yml/badge.svg)](https://github.com/andreluizleite/hackernews-best-stories-api/actions/workflows/ci.yml)
+[![.NET 10](https://img.shields.io/badge/.NET-10-512BD4)](https://dotnet.microsoft.com/)
+[![Release](https://img.shields.io/github/v/release/andreluizleite/hackernews-best-stories-api)](https://github.com/andreluizleite/hackernews-best-stories-api/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A portfolio-sized ASP.NET Core API that retrieves and ranks the best stories from the official Hacker News API. The project focuses on reliable HTTP integration, controlled concurrency, caching, observability endpoints, and automated testing without introducing unnecessary infrastructure.
 
 ## Why this project exists
